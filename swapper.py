@@ -27,7 +27,7 @@ print(train_dataset.targets)
 """
 feature = example[0]
 label = example[1]
-example[1]=69
+example[1]=60
 print(label)
 print(feature.size())
 plt.imshow(feature.reshape(28,28), cmap="gray")
