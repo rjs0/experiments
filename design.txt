@@ -1,0 +1,8 @@
+For hashing:
+
+hash each 28x28 image tensor, store in dictionary where key = hash, and value = (old label, new label)
+hash entire dataset, store in dictionary where key = hash, value = index in original dataset
+
+this allows us to check margin array and display example
+for example, we can iterate through swap_table and then use this to go through full dictionary and obtain the index of the example 
+whose label was swapped. then, we can simply access the original dataset using the obtained index, and do whatever want, such as plot it.

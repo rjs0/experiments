@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import random
 # if gpu is available, use GPU
-
+print("swapper")
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 input_size = 28 * 28 #flattened picture

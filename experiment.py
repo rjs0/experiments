@@ -4,11 +4,10 @@ from torch import nn
 import torchvision
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
-
-from swapper import swap_label
-
+import numpy as np
+import random
+print("running experiment")
 # if gpu is available, use GPU
-
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 input_size = 28 * 28 #flattened picture
@@ -18,7 +17,30 @@ num_epochs = 5
 batch_size = 100
 eval_size = 60000
 learning_rate = 0.001
+proportion=0.001
+def swap_label(x):
+    y = np.random.randint(0,10)
+    if x==y:
+        y=swap_label(x)
+    return torch.tensor(y)
 
+def swap_data(dataset, proportion):
+    swap_table = {} # tensor : (old, new)
+    swap_set_size = int(len(train_dataset) * proportion)
+    indices = list(range(0,len(dataset)))
+    """Turn shuffle on and off to debug, shuffle off will make first n pictures swapped"""
+  #  random.shuffle(indices)
+    for i in range(0,swap_set_size):
+        
+        index = indices[i]
+        
+        old = dataset.targets[index]
+        new = swap_label(old)
+        if index==0:
+            print("index=0 is "+str(old)+" change to "+str(new))
+        swap_table[hash(str(dataset[index][0]))]=(old.item(),new.item())
+        dataset.targets[index] = new
+    return dataset, swap_table
 #load MNIST
 train_dataset = torchvision.datasets.MNIST(root='./data',train=True
     ,transform=transforms.ToTensor(),download=True)
@@ -26,7 +48,8 @@ test_dataset = torchvision.datasets.MNIST(root='./data',train=False
     ,transform=transforms.ToTensor())
 
 # data loader to allow iterating
-
+train_dataset, swap_table = swap_data(train_dataset, proportion)
+print(train_dataset[0][1])
 train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
 batch_size=batch_size, shuffle=True)
 
@@ -46,20 +69,32 @@ for i in range(8):
 plt.show()  
 """
 class NeuralNet(nn.Module):
-    def __init__(self, input_size, hidden_size, num_classes):
+    def __init__(self, num_classes):
         super(NeuralNet, self).__init__()
-        self.l1 = nn.Linear(input_size,hidden_size) 
-        self.relu = nn.ReLU()
-        self.l2 = nn.Linear(hidden_size,num_classes)
+        self.conv_1 = torch.nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, stride=1, padding=1)
+        self.conv_2 = torch.nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1)
+        self.max_pool2d = torch.nn.MaxPool2d(kernel_size=2, stride=2)
+        self.linear_1 = torch.nn.Linear(7 * 7 * 64, 128)
+        self.linear_2 = torch.nn.Linear(128, num_classes)
+        self.dropout = torch.nn.Dropout(p=0.5)
+        self.relu = torch.nn.ReLU()
     
     def forward(self, x):
-        out = self.l1(x)
-        out = self.relu(out)
-        out = self.l2(out)
-    #    print(out)
-        return out
+        x = self.conv_1(x)
+        x = self.relu(x)
+        x = self.max_pool2d(x)
+        x = self.conv_2(x)
+        x = self.relu(x)
+        x = self.max_pool2d(x)
+        x = x.reshape(x.size(0), -1)
+        x = self.linear_1(x)
+        x = self.relu(x)
+        x = self.dropout(x)
+        pred = self.linear_2(x)
+        return pred
     
-model = NeuralNet(input_size, hidden_size, num_classes)  
+    
+model = NeuralNet(num_classes)  
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(),lr=learning_rate)
 
@@ -69,7 +104,7 @@ n_total_steps = len(train_loader)
 for epoch in range(num_epochs):
     for i, (images, labels) in enumerate(train_loader):
         #100 x 1 x 28 x 28 -> 100 x 784
-        images = images.reshape(-1, 28*28).to(device)
+       # images = images.reshape(-1, 28*28).to(device)
         labels = labels.to(device)
 
         #forward
@@ -88,10 +123,11 @@ for epoch in range(num_epochs):
     if epoch in [0,2,4]:
         # ... run aum tests, going through entire dataset
         for i, (images, labels) in enumerate(eval_loader):
-            images = images.reshape(-1, 28*28).to(device)
+          #  images = images.reshape(-1, 28*28).to(device)
             targets = train_dataset.targets
             logits = model(images)
             target_values = logits.gather(1, targets.view(-1, 1)).squeeze()
+            """ following four lines of code taken from AUM paper, author J Shapiro"""
             masked_logits = torch.scatter(logits, 1, targets.view(-1, 1), float('-inf')) # make target values -inf so not selected again
             other_logit_values, _ = masked_logits.max(1)
             other_logit_values = other_logit_values.squeeze()
@@ -110,7 +146,7 @@ with torch.no_grad():
     n_correct = 0
     n_samples = 0
     for images, labels in test_loader:
-        images = images.reshape(-1, 28*28).to(device)
+       # images = images.reshape(-1, 28*28).to(device)
         labels = labels.to(device)
         outputs = model(images)
         # predicted class

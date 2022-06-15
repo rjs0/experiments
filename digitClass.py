@@ -5,8 +5,8 @@ import torchvision
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 
-from swapper import swap_label
-
+#from swapper import swap_label
+print("digit class")
 # if gpu is available, use GPU
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -48,20 +48,31 @@ for i in range(8):
 plt.show()  
 """
 class NeuralNet(nn.Module):
-    def __init__(self, input_size, hidden_size, num_classes):
+    def __init__(self, num_classes):
         super(NeuralNet, self).__init__()
-        self.l1 = nn.Linear(input_size,hidden_size) 
-        self.relu = nn.ReLU()
-        self.l2 = nn.Linear(hidden_size,num_classes)
+        self.conv_1 = torch.nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, stride=1, padding=1)
+        self.conv_2 = torch.nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1)
+        self.max_pool2d = torch.nn.MaxPool2d(kernel_size=2, stride=2)
+        self.linear_1 = torch.nn.Linear(7 * 7 * 64, 128)
+        self.linear_2 = torch.nn.Linear(128, num_classes)
+        self.dropout = torch.nn.Dropout(p=0.5)
+        self.relu = torch.nn.ReLU()
     
     def forward(self, x):
-        out = self.l1(x)
-        out = self.relu(out)
-        out = self.l2(out)
-    #    print(out)
-        return out
+        x = self.conv_1(x)
+        x = self.relu(x)
+        x = self.max_pool2d(x)
+        x = self.conv_2(x)
+        x = self.relu(x)
+        x = self.max_pool2d(x)
+        x = x.reshape(x.size(0), -1)
+        x = self.linear_1(x)
+        x = self.relu(x)
+        x = self.dropout(x)
+        pred = self.linear_2(x)
+        return pred
     
-model = NeuralNet(input_size, hidden_size, num_classes)  
+model = NeuralNet(num_classes)  
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(),lr=learning_rate)
 
@@ -71,7 +82,7 @@ n_total_steps = len(train_loader)
 for epoch in range(num_epochs):
     for i, (images, labels) in enumerate(train_loader):
         #100 x 1 x 28 x 28 -> 100 x 784
-        images = images.reshape(-1, 28*28).to(device)
+        #images = images.reshape(-1, 28*28).to(device)
         labels = labels.to(device)
 
         #forward
@@ -87,10 +98,10 @@ for epoch in range(num_epochs):
             print(f'epoch {epoch+1} / {num_epochs}, step {i+1}, loss = {loss.item():.4f}')
     #
     
-    if epoch in [0,2,4]:
+    if epoch in [10,12,14]:
         # ... run aum tests, going through entire dataset
         for i, (images, labels) in enumerate(eval_loader):
-            images = images.reshape(-1, 28*28).to(device)
+           # images = images.reshape(-1, 28*28).to(device)
             targets = train_dataset.targets
             logits = model(images)
             target_values = logits.gather(1, targets.view(-1, 1)).squeeze()
@@ -112,7 +123,7 @@ with torch.no_grad():
     n_correct = 0
     n_samples = 0
     for images, labels in test_loader:
-        images = images.reshape(-1, 28*28).to(device)
+       # images = images.reshape(-1, 28*28).to(device)
         labels = labels.to(device)
         outputs = model(images)
         # predicted class
