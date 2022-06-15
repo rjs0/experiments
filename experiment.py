@@ -27,8 +27,6 @@ test_dataset = torchvision.datasets.MNIST(root='./data',train=False
 
 # data loader to allow iterating
 
-print(train_dataset[0][1])
-
 train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
 batch_size=batch_size, shuffle=True)
 
