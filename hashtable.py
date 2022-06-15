@@ -19,3 +19,7 @@ images[hash(z)]=(9,7)
 indices = list(range(0,100))
 random.shuffle(indices)
 print(indices[:5])
+i=1
+for i in range(0,60000):
+    i+=hash(str(i))
+print(i)

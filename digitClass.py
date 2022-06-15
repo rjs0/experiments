@@ -12,7 +12,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 input_size = 28 * 28 #flattened picture
 hidden_size = 100
 num_classes = 10
-num_epochs = 3
+num_epochs = 5
 batch_size = 100
 learning_rate = 0.001
 
@@ -32,7 +32,7 @@ batch_size=batch_size, shuffle=False)
 
 examples = iter(train_loader)
 samples, labels = examples.next()
-print(samples.shape,labels.shape)
+#print(samples.shape,labels.shape)
 """
 for i in range(8):
     plt.subplot(2,4,i+1)
@@ -50,6 +50,7 @@ class NeuralNet(nn.Module):
         out = self.l1(x)
         out = self.relu(out)
         out = self.l2(out)
+    #    print(out)
         return out
     
 model = NeuralNet(input_size, hidden_size, num_classes)  
@@ -67,6 +68,7 @@ for epoch in range(num_epochs):
 
         #forward
         outputs = model(images)
+    #    print(outputs.shape)
         loss=criterion(outputs,labels)
         #backward
         optimizer.zero_grad()
@@ -75,7 +77,15 @@ for epoch in range(num_epochs):
         optimizer.step()
         if (i+1) % 100 == 0:
             print(f'epoch {epoch+1} / {num_epochs}, step {i+1}, loss = {loss.item():.4f}')
-
+    #
+    """
+    if epoch in [1,3,5]:
+        # ... run aum tests, going through entire dataset
+        
+        output = model()
+        print("output shape: "+str(output.shape))
+        print(epoch)
+    """
 with torch.no_grad():
     n_correct = 0
     n_samples = 0

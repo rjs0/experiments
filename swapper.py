@@ -45,21 +45,24 @@ indices = list(range(0,len(train_dataset)))
 random.shuffle(indices)
 for i in range(0,swap_set_size):
    index = indices[i]
-   if i==0:
-       index=0
    old = train_dataset.targets[index]
   # print("old: "+str(old))
    new = swap_label(old)
   # print("new: "+str(new))
-   swap_table[hash(train_dataset[index])]=(old.item(),new.item())
+   swap_table[hash(str(train_dataset[index][0]))]=(old.item(),new.item())
    train_dataset.targets[index] = new
 
 print("Done")
-print(swap_table)
+#print(swap_table)
 
 img=iter(torch.utils.data.DataLoader(train_dataset)).next()
-print(img)
-print(train_dataset.targets[0])
+#print(img)
+print(hash(str(train_dataset[0][0])))
+#print(train_dataset[0])
+train_dataset.targets[0]=9
+#print(train_dataset[0])
+print(hash(str(train_dataset[0][0])))
+
 #print(train_dataset.targets[27])
 #print(swap_label(train_dataset.targets[0]))
 
