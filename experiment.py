@@ -1,4 +1,6 @@
+from doctest import master
 from pickletools import optimize
+from typing import final
 import torch
 from torch import nn
 import torchvision
@@ -18,6 +20,7 @@ batch_size = 100
 eval_size = 60000
 learning_rate = 0.001
 proportion=0.001
+
 def swap_label(x):
     y = np.random.randint(0,10)
     if x==y:
@@ -47,7 +50,21 @@ train_dataset = torchvision.datasets.MNIST(root='./data',train=True
 test_dataset = torchvision.datasets.MNIST(root='./data',train=False
     ,transform=transforms.ToTensor())
 
+
+master_table = {}
+""" 
+this is really slow: right now do just 10 examples (the first 10)
+"""
+limit = len(train_dataset)
+limit = 10
+for i in range(0, 10):
+    str_rep = str(train_dataset[i][0])
+    master_table[hash(str_rep)]=i
+print("Table: \n"+str(master_table))
 # data loader to allow iterating
+
+
+
 train_dataset, swap_table = swap_data(train_dataset, proportion)
 print(train_dataset[0][1])
 train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
@@ -59,8 +76,8 @@ batch_size=eval_size, shuffle=False)
 test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
 batch_size=batch_size, shuffle=False)
 
-examples = iter(train_loader)
-samples, labels = examples.next()
+#examples = iter(train_loader)
+#samples, labels = examples.next()
 #print(samples.shape,labels.shape)
 """
 for i in range(8):
@@ -97,7 +114,7 @@ class NeuralNet(nn.Module):
 model = NeuralNet(num_classes)  
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(),lr=learning_rate)
-
+margin_val=[]
 # training loop
 n_total_steps = len(train_loader)
 
@@ -133,7 +150,9 @@ for epoch in range(num_epochs):
             other_logit_values = other_logit_values.squeeze()
 
             margin_values = (target_values - other_logit_values).tolist()
-            print((margin_values[:10]))
+            margin_val=margin_values
+            print((margin_values[:100]))
+            print("average: "+str(np.mean(margin_values)))
             #print(logits.shape)
             #print(train_dataset.targets.shape)
         #set = iter(train_loader)
@@ -156,3 +175,11 @@ with torch.no_grad():
     
 acc = 100.0 * n_correct / n_samples
 print(acc)
+
+for i in range(0, 100):
+    str_rep = str(train_dataset[i][0])
+    key = hash(str_rep)
+    if(key in master_table):
+        print("Image "+str(master_table[key])+" was swapped")
+        print("Margin: "+str(margin_val[master_table[key]]))
+print(margin_val[:100])
