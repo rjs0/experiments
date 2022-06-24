@@ -41,7 +41,9 @@ def swap_data(dataset, proportion):
         new = swap_label(old)
         if index==0:
             print("index=0 is "+str(old)+" change to "+str(new))
-        swap_table[hash(str(dataset[index][0]))]=(old.item(),new.item())
+       #swap_table[hash(str(dataset[index][0]))]=(old.item(),new.item())
+ 
+        swap_table[str(dataset[index][0])]=(old.item(),new.item())
         dataset.targets[index] = new
     return dataset, swap_table
 #load MNIST
@@ -56,11 +58,12 @@ master_table = {}
 this is really slow: right now do just 10 examples (the first 10)
 """
 limit = len(train_dataset)
-limit = 10
-for i in range(0, 10):
+limit = 60000
+for i in range(0, 100):
     str_rep = str(train_dataset[i][0])
-    master_table[hash(str_rep)]=i
-print("Table: \n"+str(master_table))
+    # HASH HERE
+    master_table[str_rep]=i
+print("DONE MAKING TABLE")
 # data loader to allow iterating
 
 
@@ -153,6 +156,12 @@ for epoch in range(num_epochs):
             margin_val=margin_values
             print((margin_values[:100]))
             print("average: "+str(np.mean(margin_values)))
+            # see indices of worst 50 examples
+            k = 50
+            idx = np.argpartition(margin_values, k)
+            print("lowest margins")
+            # these are lowest
+            print(idx[:k])
             #print(logits.shape)
             #print(train_dataset.targets.shape)
         #set = iter(train_loader)
@@ -178,7 +187,8 @@ print(acc)
 
 for i in range(0, 100):
     str_rep = str(train_dataset[i][0])
-    key = hash(str_rep)
+    #key = hash(str_rep)
+    key=str_rep
     if(key in master_table):
         print("Image "+str(master_table[key])+" was swapped")
         print("Margin: "+str(margin_val[master_table[key]]))
