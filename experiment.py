@@ -32,7 +32,7 @@ def swap_data(dataset, proportion):
     swap_set_size = int(len(train_dataset) * proportion)
     indices = list(range(0,len(dataset)))
     """Turn shuffle on and off to debug, shuffle off will make first n pictures swapped"""
-  #  random.shuffle(indices)
+    random.shuffle(indices)
     for i in range(0,swap_set_size):
         
         index = indices[i]
@@ -59,10 +59,12 @@ this is really slow: right now do just 10 examples (the first 10)
 """
 limit = len(train_dataset)
 limit = 60000
-for i in range(0, 100):
+for i in range(0, limit):
     str_rep = str(train_dataset[i][0])
     # HASH HERE
     master_table[str_rep]=i
+    if(i%1000==0):
+        print("made table up to: "+str(i))
 print("DONE MAKING TABLE")
 # data loader to allow iterating
 
@@ -185,11 +187,11 @@ with torch.no_grad():
 acc = 100.0 * n_correct / n_samples
 print(acc)
 
-for i in range(0, 100):
+for i in range(0, 60000):
     str_rep = str(train_dataset[i][0])
     #key = hash(str_rep)
     key=str_rep
-    if(key in master_table):
+    if(key in swap_table):
         print("Image "+str(master_table[key])+" was swapped")
         print("Margin: "+str(margin_val[master_table[key]]))
 print(margin_val[:100])
