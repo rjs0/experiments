@@ -9,33 +9,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 #from swapper import swap_label
 # if gpu is available, use GPU
-proportion=0.05
 
-def swap_label(x):
-    y = np.random.randint(0,10)
-    if x==y:
-        y=swap_label(x)
-    return torch.tensor(y)
 
-def swap_data(dataset, proportion):
-    swap_table = {} # tensor : (old, new)
-    swap_set_size = int(len(train_dataset) * proportion)
-    indices = list(range(0,len(dataset)))
-    """Turn shuffle on and off to debug, shuffle off will make first n pictures swapped"""
-    #random.shuffle(indices)
-    for i in range(0,swap_set_size):
-        
-        index = indices[i]
-        
-        old = dataset.targets[index]
-        new = swap_label(old)
-        if index==0:
-            print("index=0 is "+str(old)+" change to "+str(new))
-       #swap_table[hash(str(dataset[index][0]))]=(old.item(),new.item())
-
-        swap_table[str(dataset[index][0])]=(old.item(),new.item())
-        dataset.targets[index] = new
-    return dataset, swap_table
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
@@ -52,22 +27,8 @@ train_dataset = torchvision.datasets.MNIST(root='./data',train=True
     ,transform=transforms.ToTensor(),download=True)
 test_dataset = torchvision.datasets.MNIST(root='./data',train=False
     ,transform=transforms.ToTensor())
-train_dataset, swap_table = swap_data(train_dataset, proportion)
 
-#swaps up to a certain amount
-master_table = {}
-""" 
-this is really slow: right now do just 10 examples (the first 10)
-"""
-limit = len(train_dataset)
-limit = 60000
-for i in range(0, limit):
-    str_rep = str(train_dataset[i][0])
-    # HASH HERE
-    master_table[str_rep]=i
-    
-print("DONE MAKING TABLE")
-#print(swap_table.values())
+
 train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
 batch_size=batch_size, shuffle=True)
 
@@ -108,10 +69,42 @@ criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(),lr=learning_rate)
 
 # training loop
+X, Y = train_dataset.data, train_dataset.targets
+
+grad_X=X.type(torch.FloatTensor)
+grad_X = torch.reshape(grad_X, (60000,1,28,28))
+DELETE_NUMBER = 9
+delete = torch.argwhere(Y==DELETE_NUMBER)
+#print(three.shape)
+prop=0.001
+#prop=1
+replaceLen = int(prop*len(delete))
+choice = np.random.choice(delete.squeeze(), replaceLen, replace=False)
+#print(choice.shape)
+notDeletion = torch.argwhere(Y!=DELETE_NUMBER).squeeze()
+notDeletion = np.array(notDeletion)
+#print(notThree.shape)
+newIndices = np.concatenate((notDeletion,choice))
+grad_X=grad_X[newIndices]
+grad_Y = train_dataset.targets
+grad_Y=grad_Y[newIndices]
+# print("evaluating with first 1000 examples")
+# print("images:")
+#print(grad_X[0])
+print("new shapes")
+print(grad_X.shape)
+print(grad_Y.shape)
+subset = torch.utils.data.Subset(train_dataset,newIndices)
+
+
+# data loader to allow iterating
+train_loader = torch.utils.data.DataLoader(dataset=subset,
+batch_size=batch_size, shuffle=True)
+
+#
 
 n_total_steps = len(train_loader)
 
-X, Y = train_dataset.data, train_dataset.targets
 print(Y[0])
 vog = {}
 normalized_vog = []
@@ -142,46 +135,28 @@ for epoch in range(num_epochs):
         #following code adapted from chirag126 https://github.com/chirag126/VOG/blob/master/toy_script.py
 
     model.eval() # no dropout, in eval mode
-    grad_X=X.type(torch.FloatTensor)
-    grad_X = torch.reshape(grad_X, (60000,1,28,28))
-# print("evaluating with first 1000 examples")
-    grad_X = grad_X[:60000]
-   # print("images:")
-    #print(grad_X[0])
-    """ if get weird errors, make sure this is ok"""
-    grad_Y = train_dataset.targets
-    grad_Y = grad_Y[:60000] # number of training examples
+
     print("labels")
     #print(grad_Y)
 #  print("dones splicing")
 
     grad_X.requires_grad = True
+    print("Shape of grad_X")
+    print(grad_X.shape)
     # am i doing backprop on the correct thing?
     node_sel = grad_Y.shape
     ones = torch.ones(node_sel) # 60000x1, one for each training example
-#  print("feeding forward")
     logits  = model(grad_X) # feed forward, keeping track of the calculation graph
-#  print("done with logits")
-   # print("probs")
-    #print("logit shape")
-   # print(logits.shape)
-  #  print(logits)
-   # probs = torch.nn.Softmax(dim=1)(logits) # 60000 x 10
-    #print(probs)
+
     sel_nodes = logits[torch.arange(len(grad_Y)), grad_Y.type(torch.LongTensor)] # changed from probs to logits
-   # print("sel nodes shape")
-    #print(sel_nodes.shape)
-   # print(sel_nodes)
-# print("running gradients")
+  
     sel_nodes.backward(ones) # is this correct?
-   # print("nodes to do backprop on")
-   # print(sel_nodes)
+ 
     grad = grad_X.grad.data.numpy()
+    
    # grad = grad.squeeze()
     print("got gradient")
-   # print(grad.shape)
-   # print(grad[3]) # RUN THIS, see if it is really just 0s
-# print("calculated gradients")
+ 
     for i in range(grad_X.shape[0]):
 
         #vog[i] = n x 1 x 28 x 28
@@ -213,13 +188,25 @@ for epoch in range(num_epochs):
 
         # training_class_varainces [class]  = [var 1, var 2, ... , var k], if there are k instances of this class in the dataset
         training_class_variances[int(grad_Y[ii].item())].append(variance)
+       
+    print("legnth of variances "+str(len(training_class_variances)))
     normalized_vog=[]
-    for ii in range(grad_X.shape[0]):
-        mu = np.mean(training_class_variances[int(grad_Y[ii].item())])
-        std  = np.std(training_class_variances[int(grad_Y[ii].item())])
-        normalized_vog.append(np.abs((training_vog_stats[ii] - mu)/std))
-# print("done with vog")
-    normalized_vog= np.ma.array(normalized_vog, mask=np.isnan(normalized_vog))
+    print("VARIANCES: ")
+    avgs = []
+   # print(training_class_variances)
+    for i in range(10):
+        print("length of variance for "+str(i)+" is "+str(len(training_class_variances[i])))
+        mu = np.mean(training_class_variances[i])
+        avgs.append(mu)
+        if(i==DELETE_NUMBER):
+            print(training_class_variances[i])
+    print(avgs)
+#     for ii in range(grad_X.shape[0]):
+#         mu = np.mean(training_class_variances[int(grad_Y[ii].item())])
+#         std  = np.std(training_class_variances[int(grad_Y[ii].item())])
+#         normalized_vog.append(np.abs((training_vog_stats[ii] - mu)/std))
+# # print("done with vog")
+#     normalized_vog= np.ma.array(normalized_vog, mask=np.isnan(normalized_vog))
 #    print(normalized_vog)
 # print(normalized_vog)
 # print("highest values")
@@ -232,22 +219,9 @@ for epoch in range(num_epochs):
     #print("NUMBER OF SWAPPED IN TOP")
     #ind=np.array(ind)
    # print((ind<481).sum())
-    if epoch>0:
-        ranks=np.argsort(normalized_vog)
-        ranks=np.array(ranks)
-        count=0
-        indices=[]
-        for i in range(0, 60000):
-            if(i%10000==0):
-                print("made table up to: "+str(i))
-            str_rep = str(train_dataset[i][0])
-            #key = hash(str_rep)
-            key=str_rep
-            if(key in swap_table):
-                index = master_table[key]
-                indices.append(np.argwhere(ranks==index)[0][0])
-       # print("variance ranks of swapped images:")
-       # print(indices)
+    
+   #     print("variance ranks of swapped images:")
+   #     print(indices)
    # for i in ind:
    #     x = train_dataset[i][0]
     #    ax = axes[count//num_col, count%num_col]
